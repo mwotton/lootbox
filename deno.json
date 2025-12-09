@@ -39,6 +39,7 @@
     "@std/cli": "jsr:@std/cli@^1.0.0",
     "@std/dotenv": "jsr:@std/dotenv@^0.225.5",
     "ts-morph": "npm:ts-morph@^23.0.0",
+    "vite": "npm:vite@^7.2.7",
     "zod": "npm:zod@^4.1.11",
     "pothos": "https://esm.sh/@pothos/core@3.21.0",
     "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@^1.22.0"

@@ -54,22 +54,39 @@ export class McpClientManager {
     try {
       console.error(`Connecting to MCP server: ${serverName}...`);
 
-      const transports = {
-        stdio: () =>
-          new StdioClientTransport({
-            command: config.command,
-            args: config.args,
-            env: { ...Deno.env.toObject(), ...config.env },
-          }),
-        streamable_http: () =>
-          new StreamableHTTPClientTransport(new URL(config.url)),
-        sse: () => new SSEClientTransport(new URL(config.url)),
-      };
+      // Choose transport based on validated config; default to stdio when omitted
+      const transport = (() => {
+        const transportType = config.transport ?? "stdio";
 
-      const transport = transports[config.transport]?.() ??
-        (() => {
-          throw new Error("Invalid MCP server config.");
-        })();
+        if (transportType === "stdio") {
+          if (!("command" in config) || !("args" in config)) {
+            throw new Error("Stdio transport requires command and args.");
+          }
+          const stdioConfig = config as McpServerConfig & {
+            command: string;
+            args: string[];
+            env?: Record<string, string>;
+          };
+          return new StdioClientTransport({
+            command: stdioConfig.command,
+            args: stdioConfig.args,
+            env: { ...Deno.env.toObject(), ...(stdioConfig.env ?? {}) },
+          });
+        }
+
+        if (
+          (transportType === "streamable_http" || transportType === "sse") &&
+          "url" in config
+        ) {
+          const httpConfig = config as McpServerConfig & { url: string };
+          const url = new URL(httpConfig.url);
+          return transportType === "streamable_http"
+            ? new StreamableHTTPClientTransport(url)
+            : new SSEClientTransport(url);
+        }
+
+        throw new Error("Invalid MCP server config.");
+      })();
 
       const client = new Client(
         {

@@ -7,21 +7,22 @@ interface McpServerConfigBase {
   transport?: "stdio" | "streamable_http" | "sse";
 }
 
-interface McpServerConfigStdio extends BaseConfig {
+interface McpServerConfigStdio extends McpServerConfigBase {
+  transport?: "stdio";
   command: string;
   args: string[];
   env?: Record<string, string>;
-  transport?: "stdio";
   url?: never;
   headers?: never;
 }
 
-interface McpServerConfigHttp extends BaseConfig {
-  url: string;
+interface McpServerConfigHttp extends McpServerConfigBase {
   transport: "streamable_http" | "sse";
+  url: string;
   headers?: Record<string, string>[];
   command?: never;
   args?: never;
+  env?: never;
 }
 
 export type McpServerConfig = McpServerConfigStdio | McpServerConfigHttp;
@@ -96,36 +97,77 @@ export function validateMcpConfig(config: unknown): McpConfigFile {
 
     const cfg = serverConfig as Record<string, unknown>;
 
-    if (typeof cfg.command !== "string") {
-      throw new Error(`Server '${serverName}' must have 'command' string`);
-    }
-
-    if (!Array.isArray(cfg.args)) {
-      throw new Error(`Server '${serverName}' must have 'args' array`);
-    }
-
-    if (!cfg.args.every((arg) => typeof arg === "string")) {
+    const transport = (cfg.transport as string | undefined) ?? "stdio";
+    if (
+      transport !== "stdio" &&
+      transport !== "streamable_http" &&
+      transport !== "sse"
+    ) {
       throw new Error(
-        `Server '${serverName}' args must be array of strings`
+        `Server '${serverName}' transport must be 'stdio', 'streamable_http', or 'sse'`
       );
     }
 
-    const validatedConfig: McpServerConfig = {
-      command: cfg.command,
-      args: cfg.args as string[],
-    };
+    let validatedConfig: McpServerConfig;
 
-    if (cfg.env !== undefined) {
-      if (typeof cfg.env !== "object" || cfg.env === null) {
-        throw new Error(`Server '${serverName}' env must be an object`);
+    if (transport === "stdio") {
+      if (typeof cfg.command !== "string") {
+        throw new Error(`Server '${serverName}' must have 'command' string`);
       }
-      const env = cfg.env as Record<string, unknown>;
-      if (!Object.values(env).every((val) => typeof val === "string")) {
+
+      if (!Array.isArray(cfg.args)) {
+        throw new Error(`Server '${serverName}' must have 'args' array`);
+      }
+
+      if (!cfg.args.every((arg) => typeof arg === "string")) {
         throw new Error(
-          `Server '${serverName}' env values must be strings`
+          `Server '${serverName}' args must be array of strings`
         );
       }
-      validatedConfig.env = env as Record<string, string>;
+
+      validatedConfig = {
+        transport,
+        command: cfg.command,
+        args: cfg.args as string[],
+      };
+
+      if (cfg.env !== undefined) {
+        if (typeof cfg.env !== "object" || cfg.env === null) {
+          throw new Error(`Server '${serverName}' env must be an object`);
+        }
+        const env = cfg.env as Record<string, unknown>;
+        if (!Object.values(env).every((val) => typeof val === "string")) {
+          throw new Error(
+            `Server '${serverName}' env values must be strings`
+          );
+        }
+        validatedConfig.env = env as Record<string, string>;
+      }
+    } else {
+      if (typeof cfg.url !== "string") {
+        throw new Error(`Server '${serverName}' must have 'url' string`);
+      }
+
+      if (
+        cfg.headers !== undefined &&
+        (!Array.isArray(cfg.headers) ||
+          !cfg.headers.every(
+            (h) =>
+              typeof h === "object" &&
+              h !== null &&
+              Object.values(h).every((v) => typeof v === "string")
+          ))
+      ) {
+        throw new Error(
+          `Server '${serverName}' headers must be array of string record objects`
+        );
+      }
+
+      validatedConfig = {
+        transport,
+        url: cfg.url,
+        headers: cfg.headers as Record<string, string>[] | undefined,
+      };
     }
 
     // Sanitize server name to ensure it's a valid identifier

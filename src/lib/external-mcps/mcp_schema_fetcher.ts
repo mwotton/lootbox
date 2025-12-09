@@ -112,7 +112,11 @@ export class McpSchemaFetcher {
         originalName: resource.name,
         description: resource.description,
         uri: resource.uri,
-        uriTemplate: resource.uriTemplate as string | undefined,
+        uriTemplate: "uriTemplate" in resource &&
+            typeof (resource as { uriTemplate?: unknown }).uriTemplate ===
+              "string"
+          ? (resource as { uriTemplate: string }).uriTemplate
+          : undefined,
         mimeType: resource.mimeType,
       }));
     } catch (error) {
